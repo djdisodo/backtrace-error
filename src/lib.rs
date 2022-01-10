@@ -102,10 +102,40 @@ impl<T: NotBacktraceError> IsBackTraceError for BacktraceError<T> {
     }
 }
 
+/*
+pub trait IntoBacktraceError<T> {
+    fn into(self) -> BacktraceError<T>;
+}
 
-impl<T: From<V> + NotBacktraceError, U: IsBackTraceError<Inner=V>, V> From<U> for BacktraceError<T> where (BacktraceError<T>, U): NotEqual {
-    fn from(backtrace_error: U) -> Self {
-        let backtrace_error = backtrace_error.backtrace_error();
+impl<T: From<U>, U> IntoBacktraceError<T> for BacktraceError<U> where (T, U): NotEqual {
+    fn into(self) -> BacktraceError<T> {
+        BacktraceError {
+            inner: T::from(self.inner),
+            backtrace: self.backtrace
+        }
+    }
+}
+
+impl<T: From<U>, U: NotBacktraceError> IntoBacktraceError<T> for U {
+    fn into(self) -> BacktraceError<T> {
+        BacktraceError {
+            inner: T::from(self),
+            backtrace: Backtrace::capture()
+        }
+    }
+}
+
+impl<T: IntoBacktraceError<U>, U> From<T> for BacktraceError<U> where (T, BacktraceError<U>): NotEqual{
+    fn from(from: T) -> Self {
+        from.into()
+    }
+}
+*/
+
+
+
+impl<T: From<U>, U> From<BacktraceError<U>> for BacktraceError<T> where (T, U): NotEqual {
+    fn from(backtrace_error: BacktraceError<U>) -> Self {
         Self {
             inner: T::from(backtrace_error.inner),
             backtrace: backtrace_error.backtrace
@@ -113,11 +143,16 @@ impl<T: From<V> + NotBacktraceError, U: IsBackTraceError<Inner=V>, V> From<U> fo
     }
 }
 
+
+
 pub auto trait NotEqual {}
 
 impl<T> !NotEqual for (T, T) {}
 
-impl<T: From<U> + NotBacktraceError, U> From<U> for BacktraceError<T> where (U, BacktraceError<T>): NotEqual{
+impl NotEqual for dyn Error + Sync + std::marker::Send + 'static {}
+
+
+impl<T: From<U>, U> From<U> for BacktraceError<T> where (U, BacktraceError<T>): NotEqual{
     fn from(residual: U) -> Self {
         Self {
             inner: T::from(residual),
