@@ -51,12 +51,13 @@
 //!
 //! I figured maybe someone out there has the same need, so am publishing it.
 
-#![feature(backtrace)]
+#![feature(backtrace, negative_impls, auto_traits)]
+#![feature(try_trait_v2)]
 
 use std::{error::Error, backtrace::Backtrace, fmt::Display};
 
 #[derive(Debug)]
-pub struct BacktraceError<E:Error> {
+pub struct BacktraceError<E> {
     pub inner: E,
     pub backtrace: Backtrace
 }
@@ -79,10 +80,36 @@ impl<E:Error + 'static> Error for BacktraceError<E> {
     }
 }
 
-impl<E:Error> From<E> for BacktraceError<E> {
-    fn from(inner: E) -> Self {
-        let backtrace = Backtrace::capture();
-        Self { inner, backtrace }
+
+
+pub auto trait NotBacktraceError {}
+
+impl<T> !NotBacktraceError for BacktraceError<T> {}
+
+impl NotBacktraceError for dyn std::error::Error + Sync + Send + 'static {
+    
+}
+
+
+impl<T: From<U> + NotBacktraceError, U> From<BacktraceError<U>> for BacktraceError<T> where (T, U): NotEqual {
+    fn from(residual: BacktraceError<U>) -> Self {
+        Self {
+            inner: T::from(residual.inner),
+            backtrace: residual.backtrace
+        }
+    }
+}
+
+pub auto trait NotEqual {}
+
+impl<T> !NotEqual for (T, T) {}
+
+impl<T: From<U> + NotBacktraceError, U: NotBacktraceError> From<U> for BacktraceError<T> {
+    fn from(residual: U) -> Self {
+        Self {
+            inner: T::from(residual),
+            backtrace: Backtrace::capture()
+        }
     }
 }
 
